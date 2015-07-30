@@ -1,8 +1,11 @@
 package com.mmcknz.android.popularmovies;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.text.format.Time;
@@ -13,6 +16,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
@@ -74,38 +78,11 @@ public class MoviesFragment extends Fragment {
                              Bundle savedInstanceState) {
         View rootView =  inflater.inflate(R.layout.fragment_main, container, false);
 
-        String[] movieArray = {
-                "Testing...",
-                "Jurassic World",
-                "Terminator Genisys",
-                "Minions",
-                "Mad Max: Fury Road",
-                "Ted 2",
-                "Insurgent",
-                "San Andreas",
-                "Chappie",
-                "Jupiter Ascending",
-                "Interstellar",
-                "Kingsman: The Secret Service",
-                "Ant-Man",
-                "The Hunger Games: Mockingjay - Part 1",
-                "The Hobbit: The Battle of the Five Armies",
-                "Maggie",
-                "John Wick",
-                "The Imitation Game",
-                "Avengers: Age of Ultron",
-                "Cinderella"
-        };
-
-        List<String> popularMovies = new ArrayList<String>(
-                Arrays.asList(movieArray)
-        );
-
         mMovieAdapter = new ArrayAdapter<String>(
                 getActivity(),
                 R.layout.list_item_movie,
                 R.id.list_item_movie_textview,
-                popularMovies
+                new ArrayList<String>()
         );
 
         ListView listView = (ListView) rootView.findViewById(
@@ -113,7 +90,40 @@ public class MoviesFragment extends Fragment {
 
         listView.setAdapter(mMovieAdapter);
 
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+                String moviedata = mMovieAdapter.getItem(position);
+                Intent detailIntent = new Intent(getActivity(), DetailActivity.class);
+                detailIntent.putExtra(Intent.EXTRA_TEXT, moviedata);
+                startActivity(detailIntent);
+            }
+        });
+
         return rootView;
+    }
+
+    private void updateMovies() {
+        FetchMoviesTask moviesTask = new FetchMoviesTask();
+        // SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        SharedPreferences sharedPrefs =
+                PreferenceManager.getDefaultSharedPreferences(getActivity());
+        String sortOrder = sharedPrefs.getString(
+                getString(R.string.pref_sort_key),
+                getString(R.string.pref_sort_label));
+        String sort_preference = "popularity.desc";
+        if (sortOrder.equals(getString(R.string.pref_sort_popular))) {
+            sort_preference = "popularity.desc";
+        } else if (sortOrder.equals(getString(R.string.pref_sort_highest_rated))) {
+            sort_preference = "vote_average.desc";
+        };
+        moviesTask.execute(sort_preference);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        updateMovies();
     }
 
     public class FetchMoviesTask extends AsyncTask<String, Void, String[]>{
@@ -143,25 +153,30 @@ public class MoviesFragment extends Fragment {
             final String TMDB_RELEASE_DATE = "release_date";
             final String TMDB_POSTER_PATH = "poster_path";
             final String TMDB_POPULARITY = "popularity";
+            final String TMDB_HIGHEST_Rating = "vote_average";
             final String TMDB_TITLE = "title";
 
             JSONObject moviesJson = new JSONObject(moviesJsonStr);
             JSONArray moviesArray = moviesJson.getJSONArray(TMDB_RESULTS);
 
             String[] resultStrs = new String[moviesArray.length()];
+            String[] posterPaths = new String[moviesArray.length()];
             for(int i = 0; i < moviesArray.length(); i++) {
 
-                String title;
+                String title, posterPath;
                 // Get the JSON object representing the title
                 JSONObject movieObject = moviesArray.getJSONObject(i);
                 title = movieObject.getString(TMDB_TITLE);
+                posterPath = movieObject.getString(TMDB_POSTER_PATH);
                 resultStrs[i] = title;
+                posterPaths[i] = "http://image.tmdb.org/t/p/" + "w342" + posterPath;
             }
 
             for (String s : resultStrs) {
                 Log.v(LOG_TAG, "movie title: " + s);
             }
-            return resultStrs;
+            //return resultStrs;
+            return posterPaths;
         }
 
         @Override
